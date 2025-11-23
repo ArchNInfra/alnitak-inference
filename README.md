@@ -90,11 +90,11 @@ These enable ALB to safely orchestrate rolling deployments without dropping traf
 
 ## Status
 
-**0.1 — Repository initialized**  
-Renamed to **Alphard** and linked to the Constellation system.
-
-**0.2 — Upcoming**  
+### 0.2 — Upcoming
 - Add FastAPI app structure  
 - Add Docker multi-stage build  
 - Add GitHub Actions CI pipeline  
 - Add ECS task/service Terraform module  
+
+### 0.1 — Repository initialized
+- Renamed to Alphard and linked to the Constellation system
