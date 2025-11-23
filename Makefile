@@ -1,7 +1,7 @@
 PYTHON := python3
 VENV := .venv
 APP_MODULE := app.main:app
-IMAGE_NAME := alnitak:dev
+IMAGE_NAME := alphard:dev
 
 .PHONY: venv install dev docker-build docker-run docker-stop
 
