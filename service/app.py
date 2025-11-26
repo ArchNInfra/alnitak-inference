@@ -1,47 +1,75 @@
-from pathlib import Path
-
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 import joblib
 import numpy as np
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from prometheus_client import Counter, generate_latest
 
 app = FastAPI()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = BASE_DIR / "ml" / "models" / "model-latest.pkl"
-
 model = None
+model_loaded = False
+
+# --- Metrics ---
+PREDICTION_COUNT = Counter(
+    "alphard_predictions_total",
+    "Total number of prediction requests served by Alphard"
+)
 
 
 class PredictionInput(BaseModel):
     features: list[float]
 
 
+# --- Global exception handler ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_error",
+            "detail": str(exc),
+        },
+    )
+
+
+# --- Startup: load model ---
 @app.on_event("startup")
 def load_model():
-    global model
-    if not MODEL_PATH.exists():
-        raise RuntimeError(f"Model not found at {MODEL_PATH}")
-
-    model = joblib.load(MODEL_PATH)
-    print(f"Model loaded from {MODEL_PATH}")
+    global model, model_loaded
+    try:
+        model = joblib.load("ml/models/model-latest.pkl")
+        model_loaded = True
+        print("[INFO] Model loaded successfully")
+    except Exception as e:
+        model = None
+        model_loaded = False
+        print(f"[ERROR] Failed to load model: {e}")
 
 
 @app.get("/health")
 def health():
+    if not model_loaded:
+        raise HTTPException(status_code=503, detail="model_not_loaded")
     return {"status": "healthy"}
 
 
-@app.post("/predict")
-def predict(input: PredictionInput):
-    if model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-
-    arr = np.array(input.features).reshape(1, -1)
-    pred = model.predict(arr)[0]
-    return {"prediction": int(pred)}
-
-
+# --- Metrics endpoint（Prometheus） ---
 @app.get("/metrics")
 def metrics():
-    return {"requests": 1}
+    data = generate_latest()
+    return Response(content=data, media_type="text/plain; version=0.0.4")
+
+
+# --- Predict ---
+@app.post("/predict")
+def predict(input: PredictionInput):
+    if not model_loaded:
+        raise HTTPException(status_code=503, detail="model_not_loaded")
+
+    features = np.array(input.features).reshape(1, -1)
+    prediction = model.predict(features)[0]
+
+    PREDICTION_COUNT.inc()
+
+    return {"prediction": int(prediction)}

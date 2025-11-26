@@ -1,52 +1,61 @@
-# Alphard – Minimal Inference Service
+# Alphard — Minimal Inference Service
 
-Alphard is the inference star of the Constellation System — a lightweight, reproducible inference API designed to run on AWS ECS Fargate later in the pipeline.
+Alphard is the inference star of the Constellation System — a lightweight, reproducible ML inference service designed for containerized deployment on AWS ECS Fargate.
 
-This version implements the **minimal ML loop **:
-
-- Train a simple ML model  
-- Serve predictions via FastAPI  
-- Package everything into a Docker image  
-
-It forms the foundation for deployment in later stages (ECS/Fargate).
+This repository implements the **minimal ML loop (Day 1–6)**:
+- Train a simple ML model
+- Serve predictions via FastAPI
+- Export Prometheus metrics
+- Package into a deterministic Docker image
+- Integrate with Thuban (ECS/Fargate baseline)
 
 ---
 
 ## Overview
 
-This repository provides:
+Alphard provides:
 
-- A reproducible ML training script (`ml/train.py`)
-- A FastAPI-based inference service (`service/app.py`)
-- A minimal Prometheus metrics endpoint
-- A Docker runtime environment
-- A clean, dependency-pinned Python environment
+- A reproducible training pipeline (`ml/train.py`)
+- A minimal FastAPI inference server (`service/app.py`)
+- Health check endpoint for ALB (`/health`)
+- Prometheus metrics (`/metrics`)
+- Dockerized runtime
+- Deterministic dependency pinning
 
-This version intentionally keeps everything small and deterministic.
+This service is intentionally minimal to ensure stability and ease of deployment across environments.
 
 ---
 
-## Scope
+## Architecture
 
-Alphard (v0.1 – minimal version) delivers:
-
-- Minimal ML training pipeline
-- FastAPI inference API
-- Basic metrics endpoint
-- Dockerized runtime environment
-- Ready for AWS ECS Fargate deployment in v0.2
+```
+                +-----------------------------+
+                |        Alphard API          |
+                |  FastAPI + Uvicorn          |
+                +--------------+--------------+
+                               |
+                     Load Model on Startup
+                               |
+                     ml/models/model-latest.pkl
+                               ^
+                               |
+                     +---------+---------+
+                     |   ml/train.py     |
+                     |  Train → Export   |
+                     +-------------------+
+```
 
 ---
 
 ## Quick Start
 
-### 1. Train the model locally
+### 1. Train the model
 
 ```
 python -m ml.train
 ```
 
-Produces:
+This produces:
 
 ```
 ml/models/model-latest.pkl
@@ -58,15 +67,25 @@ ml/models/model-latest.pkl
 uvicorn service.app:app --reload
 ```
 
-### 3. Test
+---
 
-#### Health Check
+## Endpoints
+
+| Endpoint       | Description                                 |
+|----------------|---------------------------------------------|
+| `/health`      | Service ready, model loaded                 |
+| `/predict`     | Run inference                               |
+| `/metrics`     | Prometheus metrics (counters & gauges)      |
+
+### Examples
+
+**Health**
 
 ```
 curl http://localhost:8000/health
 ```
 
-#### Prediction
+**Predict**
 
 ```
 curl -X POST http://localhost:8000/predict \
@@ -74,7 +93,7 @@ curl -X POST http://localhost:8000/predict \
   -d '{"features":[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]}'
 ```
 
-#### Metrics
+**Metrics**
 
 ```
 curl http://localhost:8000/metrics
@@ -98,17 +117,23 @@ docker run -p 8000:8000 alphard-inference:local
 
 ---
 
-## Endpoints
+## Deployment (via Thuban-infra)
 
-| Endpoint       | Description                        |
-|----------------|------------------------------------|
-| `/health`      | Service is alive and operational   |
-| `/predict`     | Perform inference using the model  |
-| `/metrics`     | Prometheus-compatible metrics      |
+Thuban provisions:
+- ECS Cluster
+- Task Definition
+- ALB + Listener + Target Group
+- IAM Task Roles
+- CloudWatch Logs
+- ECR Repository
+
+Alphard only needs to provide a container image and respond to:
+- `/health`
+- port `8000`
 
 ---
 
-## Structure
+## Repository Structure
 
 ```
 alphard-inference/
@@ -129,13 +154,12 @@ alphard-inference/
 
 ## Status
 
-### v0.2 — Upcoming
-- ECS Fargate deployment  
-- Structured logs  
-- Rolling deploy readiness endpoints  
-- GitHub Actions CI  
+### v0.2 — Completed
+- Error handling for model load failure
+- Prometheus metrics
+- ECS-ready health check
+- Stable Docker build
 
-### v0.1 — Minimal Inference Loop (Current)
-- Training script implemented  
-- FastAPI service (`/health`, `/predict`, `/metrics`)  
-- Docker image build & run  
+### v0.1 — Initial
+- Minimal training + inference loop
+
