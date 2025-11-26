@@ -2,7 +2,7 @@
 
 Alphard is the inference star of the Constellation System — a lightweight, reproducible ML inference service designed for containerized deployment on AWS ECS Fargate.
 
-This repository implements the **minimal ML loop (Day 1–6)**:
+This repository implements the **minimal ML loop **:
 - Train a simple ML model
 - Serve predictions via FastAPI
 - Export Prometheus metrics
